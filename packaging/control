@@ -1,0 +1,14 @@
+Package: laptop-server
+Version: @VERSION@
+Architecture: all
+Maintainer: Gooder24 <162874774+Gooder24@users.noreply.github.com>
+Section: admin
+Priority: optional
+Depends: systemd, util-linux, keyd, systemd-zram-generator
+Description: run a laptop as a headless server
+ A laptop makes a quiet, frugal server with a battery for a UPS, but out of the
+ box it sleeps when its lid closes, keeps its screen lit and holds its battery
+ at 100 % for years. With this package the lid does nothing, the machine never
+ sleeps, the display goes dark after the start (SUPER+D switches it), charging
+ stops at 80 %, swap lives in compressed memory and the boot menu does not
+ wait. "laptop-server check" says what works.

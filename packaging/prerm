@@ -1,0 +1,6 @@
+#!/bin/sh
+# No dark display is left behind.
+set -e
+case $1 in remove | deconfigure) ;; *) exit 0 ;; esac
+systemctl disable laptop-server-display-off.service laptop-server-battery.service || true
+[ ! -d /run/systemd/system ] || /usr/bin/laptop-server display on || true

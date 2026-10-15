@@ -1,0 +1,12 @@
+[Unit]
+Description=Limit battery charging (CHARGE_LIMIT in /etc/laptop-server.conf)
+# Most firmware forgets the limit when the machine starts; the udev rule covers a battery that comes later.
+After=systemd-udevd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/laptop-server battery apply
+
+[Install]
+WantedBy=multi-user.target

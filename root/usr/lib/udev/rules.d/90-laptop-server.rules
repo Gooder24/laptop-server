@@ -1,0 +1,5 @@
+# A graphics driver that takes the screen over (i915 after the firmware's framebuffer) turns it on. When that
+# happens after laptop-server-display-off.service, the display would stay on: set it again to what it was.
+ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="/usr/bin/laptop-server display again"
+# A battery that appears later (plugged in, or its driver loads late) gets the charge limit too.
+ACTION=="add", SUBSYSTEM=="power_supply", ATTR{type}=="Battery", RUN+="/usr/bin/laptop-server battery apply"

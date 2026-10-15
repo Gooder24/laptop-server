@@ -1,0 +1,202 @@
+#!/bin/bash
+# laptop-server: a laptop that serves, with no desktop and nobody at it.
+#   laptop-server check                        is this laptop set up to serve? ok / WARN / FAIL, exit 1 on FAIL
+#   laptop-server display on|off|toggle|status the built-in display (SUPER+D toggles it); needs root, status not
+#   laptop-server battery [apply]              the charge limit: as it is, or set from CHARGE_LIMIT (root)
+#   laptop-server --self-test
+# Settings: /etc/laptop-server.conf.
+set -u
+CHARGE_LIMIT=80
+POWER_SUPPLY=/sys/class/power_supply
+RUN_DIR=/run/laptop-server
+GRUB_DEFAULTS='/etc/default/grub /etc/default/grub.d/*.cfg'
+conf=${LAPTOP_SERVER_CONF:-/etc/laptop-server.conf}
+# shellcheck source=/dev/null
+[[ -r $conf ]] && source "$conf"
+
+# --- display --------------------------------------------------------------------------------------------------
+# Off is the console's forced blanking (setterm --blank force). Plain blanking, which is also what writing to
+# /sys/class/graphics/fb0/blank gives, is undone by any key press: by releasing SUPER+D itself.
+# The backlight is switched too, for a machine whose graphics driver cannot power its panel down.
+console() { setterm --term linux --blank "$@" < /dev/tty0; }
+
+display() {
+  local state=$RUN_DIR/display action=${1:-status} power file
+  case $action in
+    status) cat "$state" 2> /dev/null || echo on; return ;;
+    toggle) if [[ $(console) == 0 ]]; then action=off; else action=on; fi ;;
+    again) action=$(display status) ;;  # udev: a graphics driver has just taken the screen over, and turned it on
+  esac
+  case $action in
+    on) console poke; power=0 ;;
+    # Unblanked first: the console skips blanking when it counts itself blanked already, which it does after a
+    # new driver has lit the screen behind its back.
+    off) console poke; console force; power=4 ;;
+    *) echo 'usage: laptop-server display on|off|toggle|status' >&2; return 2 ;;
+  esac
+  for file in /sys/class/backlight/*/bl_power; do
+    [[ -w $file ]] && echo "$power" > "$file"
+  done
+  mkdir -p "$RUN_DIR" && echo "$action" > "$state"
+}
+
+# --- battery --------------------------------------------------------------------------------------------------
+# A battery kept at 100 % on the charger for years wears out fastest. The kernel offers a limit for many
+# laptops (ThinkPad, ASUS, Lenovo IdeaPad, Huawei, Framework, some Dell and HP) as charge_control_end_threshold.
+batteries() {
+  local battery
+  for battery in "$POWER_SUPPLY"/*; do
+    [[ $(cat "$battery/type" 2> /dev/null) == Battery ]] && echo "$battery"
+  done
+}
+
+battery_apply() {  # CHARGE_LIMIT to every battery that takes one; empty leaves charging to the firmware
+  local limit=${CHARGE_LIMIT:-} battery start end from failed=0
+  [[ -n $limit ]] || return 0
+  [[ $limit =~ ^[0-9]+$ ]] && ((limit >= 1 && limit <= 100)) || { echo "CHARGE_LIMIT=$limit: not 1 to 100" >&2; return 2; }
+  for battery in $(batteries); do
+    end=$battery/charge_control_end_threshold start=$battery/charge_control_start_threshold
+    [[ -e $end ]] || continue
+    # Where there is a start threshold (ThinkPads) it has to stay below the end one, and the firmware refuses
+    # a write that would cross them; written before and after the end one, it lands whichever way the limit
+    # moves. 0 to 100 is the factory setting.
+    from=$((limit < 100 ? limit - 10 : 0))
+    ((from >= 0)) || from=0
+    [[ -e $start ]] && { echo "$from" > "$start"; } 2> /dev/null
+    { echo "$limit" > "$end"; } 2> /dev/null
+    [[ -e $start ]] && { echo "$from" > "$start"; } 2> /dev/null
+    [[ $(cat "$end") == "$limit" ]] || { echo "${battery##*/}: the firmware keeps $(cat "$end") %, not $limit %" >&2; failed=1; }
+  done
+  return $failed
+}
+
+battery_status() {  # one line per battery: BAT0: 64 %, Charging, stops at 80 %
+  local battery end line
+  for battery in $(batteries); do
+    end=$battery/charge_control_end_threshold
+    line="${battery##*/}: $(cat "$battery/capacity" 2> /dev/null || echo '?') %, $(cat "$battery/status" 2> /dev/null || echo '?')"
+    if [[ -e $end ]]; then line+=", stops at $(cat "$end") %"; else line+=', no charge limit the kernel can set'; fi
+    echo "$line"
+  done
+}
+
+# --- check ----------------------------------------------------------------------------------------------------
+failed=0
+ok() { printf 'ok    %s\n' "$1"; }
+warn() { printf 'WARN  %s\n' "$1"; }
+check() {  # check "<description>" <command...>
+  local name=$1 output
+  shift
+  if output=$("$@" 2>&1); then
+    ok "$name"
+  else
+    printf 'FAIL  %s\n' "$name"
+    [[ -n $output ]] && sed 's/^/        /' <<< "$output"
+    failed=1
+  fi
+}
+
+logind() { busctl "$1" org.freedesktop.login1 /org/freedesktop/login1 "${@:2}"; }
+
+lid_ignored() {
+  local property value
+  for property in HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
+    value=$(logind get-property org.freedesktop.login1.Manager "$property") || return 1
+    [[ $value == 's "ignore"' ]] || { echo "$property is $value"; return 1; }
+  done
+}
+
+never_sleeps() {
+  local method answer
+  for method in CanSuspend CanHibernate CanHybridSleep CanSuspendThenHibernate; do
+    answer=$(logind call org.freedesktop.login1.Manager "$method") || return 1
+    [[ $answer != 's "yes"' ]] || { echo "$method says yes"; return 1; }
+  done
+}
+
+zram_swap() { grep -q '^/dev/zram' /proc/swaps || { echo "swap: $(tail -n +2 /proc/swaps | cut -d' ' -f1 | paste -sd' ')"; return 1; }; }
+
+display_key() {
+  systemctl is-active --quiet keyd || { echo "keyd: $(systemctl is-active keyd)"; return 1; }
+  grep -qx -e on -e off <<< "$(display status)"
+}
+
+grub_timeout() {  # the last GRUB_TIMEOUT= of GRUB's settings, read in the order update-grub reads them
+  local file found value=
+  # shellcheck disable=SC2086  # the glob is meant
+  for file in $GRUB_DEFAULTS; do
+    [[ -r $file ]] || continue
+    found=$(sed -n 's/^GRUB_TIMEOUT=["'\'']\{0,1\}\([0-9]*\).*/\1/p' "$file" | tail -1)
+    [[ -z $found ]] || value=$found
+  done
+  echo "$value"
+}
+
+check_all() {
+  local timeout line
+  check 'the lid does nothing' lid_ignored
+  check 'the machine never sleeps' never_sleeps
+  check 'swap in compressed memory' zram_swap
+  check "the display is $(display status), SUPER+D switches it" display_key
+  if [[ -z $(batteries) ]]; then
+    ok 'no battery'
+  else
+    while read -r line; do
+      case $line in
+        *'no charge limit'*) warn "$line: it charges to 100 %" ;;
+        *", stops at ${CHARGE_LIMIT:-100} %") ok "$line" ;;
+        *) [[ -n ${CHARGE_LIMIT:-} ]] && warn "$line; CHARGE_LIMIT is $CHARGE_LIMIT: sudo laptop-server battery apply" || ok "$line" ;;
+      esac
+    done < <(battery_status)
+  fi
+  if [[ -e /etc/default/grub ]]; then
+    timeout=$(grub_timeout)
+    [[ $timeout == 0 ]] && ok 'the boot menu does not wait' || warn "the boot menu waits ${timeout:-5} s: sudo update-grub"
+  fi
+  return $failed
+}
+
+# --- self-test ------------------------------------------------------------------------------------------------
+self_test() {
+  local dir fail=0
+  dir=$(mktemp -d)
+  t() { "$@" || { echo "self-test failed: $*" >&2; fail=1; }; }
+  POWER_SUPPLY=$dir/ps
+  mkdir -p "$dir"/ps/{BAT0,BAT1,AC}
+  echo Battery > "$dir/ps/BAT0/type"; echo Battery > "$dir/ps/BAT1/type"; echo Mains > "$dir/ps/AC/type"
+  echo 100 > "$dir/ps/BAT0/charge_control_end_threshold"; echo 95 > "$dir/ps/BAT0/charge_control_start_threshold"
+  echo 77 > "$dir/ps/BAT0/capacity"; echo Charging > "$dir/ps/BAT0/status"
+  CHARGE_LIMIT=80 battery_apply
+  t test "$(cat "$dir/ps/BAT0/charge_control_end_threshold"):$(cat "$dir/ps/BAT0/charge_control_start_threshold")" = 80:70
+  CHARGE_LIMIT=5 battery_apply
+  t test "$(cat "$dir/ps/BAT0/charge_control_start_threshold")" = 0
+  CHARGE_LIMIT=100 battery_apply
+  t test "$(cat "$dir/ps/BAT0/charge_control_end_threshold"):$(cat "$dir/ps/BAT0/charge_control_start_threshold")" = 100:0
+  CHARGE_LIMIT='' battery_apply && t test "$(cat "$dir/ps/BAT0/charge_control_end_threshold")" = 100
+  t eval '! CHARGE_LIMIT=101 battery_apply 2> /dev/null'
+  t eval '! CHARGE_LIMIT=8x battery_apply 2> /dev/null'
+  t test "$(batteries | wc -l)" = 2
+  t test "$(battery_status | head -1)" = "BAT0: 77 %, Charging, stops at 100 %"
+  t test "$(battery_status | tail -1)" = "BAT1: ? %, ?, no charge limit the kernel can set"
+  printf 'GRUB_DEFAULT=0\nGRUB_TIMEOUT=5\n' > "$dir/grub"; printf 'GRUB_TIMEOUT="0"\n' > "$dir/a.cfg"
+  printf '# GRUB_TIMEOUT=9\n' > "$dir/b.cfg"
+  t test "$(GRUB_DEFAULTS="$dir/grub $dir/*.cfg" grub_timeout)" = 0
+  t test "$(GRUB_DEFAULTS="$dir/grub $dir/b.cfg" grub_timeout)" = 5
+  rm -rf "$dir"
+  ((fail == 0)) && echo 'laptop-server: self-test ok'
+  return $fail
+}
+
+case ${1:-} in
+  check) check_all ;;
+  display) shift; display "$@" ;;
+  battery)
+    case ${2:-} in
+      '') battery_status ;;
+      apply) battery_apply ;;
+      *) echo 'usage: laptop-server battery [apply]' >&2; exit 2 ;;
+    esac
+    ;;
+  --self-test) self_test ;;
+  *) sed -n '2,7s/^# \{0,1\}//p' "$0"; [[ ${1:-} == -h || ${1:-} == --help ]] ;;
+esac

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Switches on what the files alone do not: the services, the lid in the running logind, GRUB's timeout.
+# In a chroot (an installer) only what lasts is done; the rest comes with the first start.
+set -e
+[ "$1" = configure ] || exit 0
+systemctl enable laptop-server-display-off.service laptop-server-battery.service keyd.service
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload
+  udevadm control --reload || true
+  systemctl restart keyd.service || true                # SUPER+D
+  systemctl restart laptop-server-battery.service || true
+  systemctl reload systemd-logind.service 2> /dev/null || true  # the lid; an older logind takes it at the next start
+fi
+if command -v update-grub > /dev/null; then update-grub; fi
+# Sleep is refused at once; compressed swap and the dark display come with the next start.

@@ -1,0 +1,17 @@
+#!/bin/sh
+# The lid and sleep go back to systemd's defaults at once; GRUB's timeout and the SUPER+D binding are
+# settings in /etc and go with purge. The battery keeps its limit until the next start.
+set -e
+case $1 in
+  remove | purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload || true
+      systemctl reload systemd-logind.service 2> /dev/null || true
+    fi
+    if [ "$1" = purge ]; then
+      rm -rf /run/laptop-server
+      [ ! -d /run/systemd/system ] || systemctl try-restart keyd.service || true
+      if command -v update-grub > /dev/null; then update-grub || true; fi
+    fi
+    ;;
+esac
