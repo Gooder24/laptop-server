@@ -31,10 +31,16 @@ first key press. Two more details keep it dark: a udev rule sets it again when a
 screen over after the start (it turns the screen on), and `getty@tty1` keeps its screen (`TTYVTDisallocate=no`),
 because clearing it makes the kernel set the video mode again and light the panel.
 
-## Install
+## Requirements
+
+- Debian or Ubuntu with systemd. The package depends on `systemd`, `util-linux`, `keyd` and `systemd-zram-generator`.
+- To build the package: `make` and `dpkg-deb`.
+- Root (`sudo`) to install it, and to change the display, the charge limit or the boot menu.
+
+## Quick start
 
 ```sh
-make deb                              # needs dpkg-deb; or download the .deb of a release
+make deb                              # builds laptop-server_0.1.0_all.deb; needs make and dpkg-deb
 sudo apt install ./laptop-server_*.deb
 laptop-server check
 ```
@@ -98,6 +104,12 @@ TLP and `power-profiles-daemon` manage power on laptops you sit at, TLP includin
 defaults are about battery life away from the charger. Guides for "laptop as a server" cover the lid in
 `logind.conf`, usually without the rest. This package is the whole set for a laptop that never leaves the
 charger and that nobody looks at.
+
+## Accessibility
+
+The output is plain text: every status is a word (`ok`, `WARN`, `FAIL`), and the tool prints no colour. The
+accessibility workflow checks the documentation's headings, image alternative text and link text with
+`.github/scripts/check-docs.py`. Known limitations and how to report a barrier are in [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## License
 
