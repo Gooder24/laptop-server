@@ -1,0 +1,40 @@
+name: Accessibility barrier
+description: Report something you cannot read, reach or use with a keyboard, a screen reader, a larger terminal font, or without colour.
+title: "Accessibility: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting this. You do not need to name a disability or explain why the barrier affects you.
+  - type: textarea
+    id: task
+    attributes:
+      label: What were you trying to do?
+      placeholder: For example, read the result of `laptop-server check` in a screen reader.
+    validations:
+      required: true
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What went wrong?
+      description: What you expected and what happened instead. Paste the command output if it helps, and remove anything private.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Terminal, operating system and assistive technology
+      description: Include versions where you can.
+      placeholder: "For example: the terminal and its version, Debian 13, the screen reader and its version"
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: See "Severity" in ACCESSIBILITY.md.
+      options:
+        - "Critical: a core task cannot be done"
+        - "Serious: significant difficulty, but a workaround exists"
+        - "Moderate: an annoyance or an inconsistent experience"
+        - "Minor: little effect on use"
+        - "Not sure"
