@@ -6,8 +6,8 @@ boot menu does not wait, and `laptop-server check` says whether all of that hold
 systemd settings and one small script; nothing runs in the background.
 
 A laptop is a good small server. It draws 5 to 15 W, makes no noise, has its own keyboard and screen for the
-day the network is down, and its battery is a UPS that rides out a power cut. Out of the box it is a bad one:
-it suspends when the lid closes or when it has been idle, its screen burns all day, and it holds its battery at
+day the network is down, and its battery is an uninterruptible power supply (UPS) that rides out a power cut.
+Out of the box it is a bad one: it suspends when the lid closes or when it has been idle, its screen burns all day, and it holds its battery at
 100 % on the charger for years, which wears the battery out fastest. This package fixes those, and only those.
 
 Made for [KarchiOS Headless](https://github.com/Gooder24/karchi-os-headless-debian), a Debian 13 install for
@@ -15,13 +15,13 @@ laptops that run AI coding agents around the clock; works on any Debian or Ubunt
 
 ## What it changes, and why a server wants it
 
-| | how | why |
+| change | how | why |
 |---|---|---|
 | **the lid does nothing** | `logind.conf.d`: `HandleLidSwitch*=ignore`, on battery, on power and docked | close it, stack it, put it on a shelf: it keeps serving |
 | **the machine never sleeps** | `sleep.conf.d`: `AllowSuspend=no`, hibernation off | not the lid, not an idle timer, not a stray `systemctl suspend`: a suspended server answers nobody |
 | **the display is dark, `SUPER + D` lights it** | `laptop-server display`, `laptop-server-display-off.service`, a `keyd` binding | the panel and its backlight are the biggest power draw and wear out; when you do stand at the machine, one key gives you the console |
 | **charging stops at 80 %** | `charge_control_end_threshold` of every battery, at start and when a battery appears | a lithium battery kept full and warm loses its capacity in a year or two; at 80 % it keeps it, and still covers a power cut |
-| **swap in compressed memory** | `systemd-zram-generator`: zstd, half the memory, 4 GB at most | old laptops have little memory; zram stretches it, and no swap partition wears the SSD |
+| **swap in compressed memory** | `systemd-zram-generator`: zstd, half the memory, 4 GB at most | old laptops have little memory; zram stretches it, and no swap partition wears the solid-state drive (SSD) |
 | **the boot menu does not wait** | `GRUB_TIMEOUT=0` | after a power cut or a reboot the machine is back in seconds, with nobody to press Enter (`Esc` still shows the menu) |
 | **it tells you** | `laptop-server check` | on the console or over SSH: `ok`, `WARN` with what to do, `FAIL` with exit code 1 |
 
@@ -47,7 +47,7 @@ laptop-server check
 
 The lid setting and the charge limit apply at once; the dark display and compressed swap from the next start.
 Removing the package turns the display on and gives the lid and sleep back to systemd's defaults; purge also
-removes the GRUB timeout and the `SUPER + D` binding.
+removes the GNU GRand Unified Bootloader (GRUB) timeout and the `SUPER + D` binding.
 
 Other distributions: `make install DESTDIR=…` lays out the files for a package (systemd paths under `/usr`,
 settings under `/etc`); then enable `laptop-server-display-off` and `laptop-server-battery`, enable `keyd`, and
@@ -67,7 +67,7 @@ laptop-server --self-test
 
 `/etc/laptop-server.conf`:
 
-| | default | |
+| setting | default | meaning |
 |---|---|---|
 | `CHARGE_LIMIT` | 80 | charging stops here; 100 is the factory setting, empty leaves the firmware alone |
 
@@ -93,8 +93,8 @@ battery is not topped up for every percent it loses.
 ## Tests
 
 `make check` runs the self-test (charge limit with a made-up `/sys`, GRUB's timeout as `update-grub` reads it).
-The whole package is tested in KarchiOS Headless's VM test: a fresh install, two starts with a power cut in
-between, the lid and sleep settings as logind reports them, compressed swap, and the screen measured dark after
+The whole package is tested in KarchiOS Headless's virtual machine (VM) test: a fresh install, two starts with a power
+cut in between, the lid and sleep settings as logind reports them, compressed swap, and the screen measured dark after
 the start, not lit by an ordinary key, lit and darkened by `SUPER + D`. The charge limit is checked on real
 laptops (ASUS Vivobook X1504V).
 
