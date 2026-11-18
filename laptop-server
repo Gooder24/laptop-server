@@ -137,7 +137,7 @@ check_all() {
   check 'the lid does nothing' lid_ignored
   check 'the machine never sleeps' never_sleeps
   check 'swap in compressed memory' zram_swap
-  check "the display is $(display status), SUPER+D switches it" display_key
+  check "the display is $(display status), SUPER+D or Ctrl+Alt+D switches it" display_key
   if [[ -z $(batteries) ]]; then
     ok 'no battery'
   else
