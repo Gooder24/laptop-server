@@ -55,13 +55,11 @@ run `update-grub` or your distribution's equivalent.
 
 ## Commands
 
-```
-laptop-server check                         ok / WARN / FAIL for everything above
-laptop-server display on|off|toggle|status  the built-in display (root, except status)
-laptop-server battery                       BAT0: 64 %, Charging, stops at 80 %
-laptop-server battery apply                 set CHARGE_LIMIT now (root)
-laptop-server --self-test
-```
+- `laptop-server check`: ok, WARN or FAIL for everything above.
+- `laptop-server display on|off|toggle|status`: the built-in display (root, except `status`).
+- `laptop-server battery`: the charge, for example `BAT0: 64 %, Charging, stops at 80 %`.
+- `laptop-server battery apply`: set `CHARGE_LIMIT` now (root).
+- `laptop-server --self-test`: the self-test of `make check`.
 
 ## Settings
 
