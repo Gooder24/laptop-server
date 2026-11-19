@@ -72,8 +72,8 @@ Checked so far:
 Not checked:
 
 - other distributions, and a fresh install of the package (installing needs root);
-- other terminal applications;
-- any screen reader (see [Screen reader check](#screen-reader-check)).
+- other terminal applications than tmux and lxterminal;
+- screen readers other than Orca (see [Screen reader check](#screen-reader-check)).
 
 ## Known limitations
 
@@ -81,9 +81,8 @@ Not checked:
   they press `SUPER + D`, which turns the display on. SSH sessions are not affected.
 - **`SUPER + D` needs keyd.** The shortcut works only while the `keyd` service runs, and only on a keyboard that
   has a Super key.
-- **No screen reader check yet.** The output is plain text, but no screen reader has been run on it.
-- **Two documentation barriers are open:** two tables have empty header cells ([#1](https://github.com/Gooder24/laptop-server/issues/1)),
-  and some abbreviations are not spelled out at first use ([#2](https://github.com/Gooder24/laptop-server/issues/2)).
+- **The screen reader check was a transcript, not a person listening.** NVDA, VoiceOver, braille and a `WARN`
+  line read aloud are not tested; see [Screen reader check](#screen-reader-check).
 
 ## Manual checks
 
@@ -101,7 +100,7 @@ These checks are for the terminal tool and its documentation:
 - **Alternatives:** the repository has no images or videos. `check-docs.py` checks the alternative text of any image added later.
 - **Links:** link text is not only "here", "link" or a similar word (`check-docs.py`).
 - **Captions:** not applicable, the repository has no video.
-- **Tables:** every column has a header. Checked by hand; [#1](https://github.com/Gooder24/laptop-server/issues/1) tracks the two tables that do not.
+- **Tables:** every column has a header. Checked by hand and with Orca, which reads the header of every cell; the empty headers of [#1](https://github.com/Gooder24/laptop-server/issues/1) are fixed.
 - **Code blocks:** plain text, with no information carried by colour.
 
 Representative documents, reviewed by hand: `README.md`, `ACCESSIBILITY.md`, `CONTRIBUTING.md` and the templates in `.github/`.
@@ -113,12 +112,24 @@ For each one, type the command, press Enter, and check that the prompt comes bac
 
 ## Screen reader check
 
-Not yet run. To run it:
+Run on 19 November 2026 with Orca 48.1 and speech-dispatcher 0.12.0 on Debian 13 (thinkpad-e540): the README as
+GitHub renders it, in Chromium 156, and `laptop-server check` typed into lxterminal. An agent ran it with `citacka`
+(karchi-skills), which writes down the text Orca sends to the synthesizer: the words, not the voice. Default Orca
+settings, key echo off. The transcripts are in [this gist](https://gist.github.com/Gooder24/f9c09125d3f3f09e0ddc778a80dde622).
+
+- **README:** 11 headings, each read with its level; the two tables read with their size and the column header of
+  every cell; the abbreviations are spelled out where they first appear (UPS, SSD, GRUB, VM).
+- **Fixed:** the Commands section was a code block in which each command ran into its description, read as one
+  sentence. It is a list now (`a173735`).
+- **`laptop-server check`:** every line is read, status word first, also in flat review line by line. This
+  machine has no battery and printed only `ok` lines, so no `WARN` line and its fix were heard.
+
+To repeat it with a screen reader of your own:
 
 1. Turn on a screen reader for the terminal you use, for example Orca on a Linux desktop.
 2. Run `laptop-server check` and listen to the whole output.
 3. Check that each line starts with its status word, and that each `WARN` line names the fix (for example `sudo update-grub`).
-4. Write the screen reader, its version, the terminal and the operating system in the issue or pull request.
+4. Write the screen reader, its version, the terminal and the operating system in an issue or pull request.
 
 ## Dependencies
 
