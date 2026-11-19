@@ -9,7 +9,7 @@ make check                              # shell syntax and the self-test; second
 python3 .github/scripts/check-docs.py   # Markdown headings, image alt text and link text
 ```
 
-The accessibility workflow runs only the documentation check, on every pull request and on pushes to `main`. Run `make check` yourself.
+The accessibility workflow runs only the documentation check, on every pull request and push to `main` that changes a Markdown file or the check itself. Run `make check` yourself.
 
 ## Pull requests
 

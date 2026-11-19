@@ -20,7 +20,7 @@ We use their documentation criteria as a guide.
 
 If you change the tool or its documentation:
 
-- Run `make check`. Run `python3 .github/scripts/check-docs.py`; the accessibility workflow runs it on every pull request.
+- Run `make check`. Run `python3 .github/scripts/check-docs.py`; the accessibility workflow runs it on every pull request that changes a Markdown file or the check itself.
 - Keep every status readable without colour: keep its word.
 - Do not rely on width. Long lines must wrap without losing words.
 - Keep documentation headings in order, give every table a header in each column, and write link text that names its target.
